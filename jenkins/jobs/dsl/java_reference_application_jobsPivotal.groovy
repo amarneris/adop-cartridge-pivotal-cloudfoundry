@@ -1,40 +1,4 @@
-import jenkins.model.*
-import com.cloudbees.plugins.credentials.*
-import com.cloudbees.plugins.credentials.common.*
-import com.cloudbees.plugins.credentials.domains.*
-import com.cloudbees.plugins.credentials.impl.*
-import com.cloudbees.jenkins.plugins.sshcredentials.impl.*
-import hudson.plugins.sshslaves.*;
-/*
-domain = Domain.global()
-store = Jenkins.instance.getExtensionList('com.cloudbees.plugins.credentials.SystemCredentialsProvider')[0].getStore()
-
-pivotalCred = new UsernamePasswordCredentialsImpl(CredentialsScope.GLOBAL,"CF_Credentials", "userP", "password")
-
-store.addCredentials(domain, pivotalCred)
-
-
-//Credentials pivotalCred = (Credentials) new UsernamePasswordCredentialsImpl(CredentialsScope.GLOBAL,java.util.UUID.randomUUID().toString(), "CF_Credentials", "user", "password")
-//SystemCredentialsProvider.getInstance().getStore().addCredentials(Domain.global(), pivotalCred)
-
-def list_pcf_credentials(){
-  def creds = com.cloudbees.plugins.credentials.CredentialsProvider.lookupCredentials(
-    com.cloudbees.plugins.credentials.common.StandardUsernameCredentials.class,
-    Jenkins.instance,
-    null,
-    null
-  );
-
-  for (c in creds) {
-    if (c.description=="CF_Credentials"){
-      return c.id
-    }
-  }
-}
-*/
-def pivotalCred = 'CF_Credentials'
-def pivotalCredentials = jm.getCredentialsId(pivotalCred)
-println "CF_Credentials ID is: "+pivotalCredentials
+def pivotalCredentials = "CF_Credentials"
 
 // Folders
 def workspaceFolderName = "${WORKSPACE_NAME}"
