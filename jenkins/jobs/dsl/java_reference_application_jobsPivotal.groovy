@@ -3,11 +3,8 @@ import com.cloudbees.plugins.credentials.*;
 import com.cloudbees.plugins.credentials.domains.*;
 import jenkins.model.*
 
-
-
-Credentials pivotalCred = (Credentials) new UsernamePasswordCredentialsImpl(CredentialsScope.GLOBAL,java.util.UUID.randomUUID().toString(), "CF_Credentials", "user", "password")
-
-SystemCredentialsProvider.getInstance().getStore().addCredentials(Domain.global(), pivotalCred)
+//Credentials pivotalCred = (Credentials) new UsernamePasswordCredentialsImpl(CredentialsScope.GLOBAL,java.util.UUID.randomUUID().toString(), "CF_Credentials", "user", "password")
+//SystemCredentialsProvider.getInstance().getStore().addCredentials(Domain.global(), pivotalCred)
 
 def list_pcf_credentials(){
   def creds = com.cloudbees.plugins.credentials.CredentialsProvider.lookupCredentials(
@@ -217,7 +214,7 @@ deployJob.with {
         stringParam("PARENT_BUILD", "Reference_Application_Build", "Parent build name")
         stringParam("CF_APP_INSTANCES", '', "Number of CF instances")
         stringParam("ENVIRONMENT_NAME", '', "Name of the environment.")
-               
+
     }
     wrappers {
         preBuildCleanup()
@@ -525,7 +522,7 @@ highavailabilityCFDevJob.with {
             |echo "Killing CF application in CF developement space"
             |echo "================================================================="
             |set -x
-            |./cf ssh adop-petclinic -c 'kill -9 $(pidof java)'  
+            |./cf ssh adop-petclinic -c 'kill -9 $(pidof java)'
             |set +x
             |echo "================================================================="
             |echo "Instance killed - Waiting until the application comes up again"
@@ -684,12 +681,12 @@ highavailabilityCFProdJob.with {
             |echo "Killing 1 of the 2 CF instances where the application is deployed"
             |echo "=================================================================================="
             |set -x
-            |./cf ssh adop-petclinic-prod -c 'kill -9 $(pidof java)' -i 0  
+            |./cf ssh adop-petclinic-prod -c 'kill -9 $(pidof java)' -i 0
             |set +x
             |echo "=================================================================================="
             |echo "Instance killed - Verifying that the application is not affected"
-            |echo "=================================================================================="  
-            |if curl -f -q http://adop-petclinic-prod.cfapps.io/ -o /dev/null; then 
+            |echo "=================================================================================="
+            |if curl -f -q http://adop-petclinic-prod.cfapps.io/ -o /dev/null; then
             |   echo "====================================================================================="
             |   echo "Although one of the instances is down the application is still accessible..."
             |   echo "====================================================================================="
@@ -699,5 +696,5 @@ highavailabilityCFProdJob.with {
             |set -x'''.stripMargin()
         )
     }
-    
+
 }
