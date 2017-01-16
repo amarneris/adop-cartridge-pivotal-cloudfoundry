@@ -32,7 +32,7 @@ def list_pcf_credentials(){
   }
 }
 */
-def pivotalCredentials=jm.getCredentialsId("CF_Credentials")
+def pivotalCredentials=jm.getCredentialsId('CF_Credentials')
 println "CF_Credentials ID is: "+pivotalCredentials
 
 // Folders
