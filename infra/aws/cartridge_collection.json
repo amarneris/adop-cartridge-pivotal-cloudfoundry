@@ -1,0 +1,14 @@
+{
+	"name": "ADOP_Pivotal_Cloudfoundry_Cartridge_Collection",
+	"cartridges": [{
+		"folder": {
+			"name": "PCF_Cartridge",
+			"display_name": "ADOP Pivotal Cloudfoundry Cartridge",
+			"description": "This provides a reference continous integration and delivery pipeline for Pivotal's Cloudfoundry."
+		},
+		"cartridge": {
+			"url": "ssh://jenkins@gerrit:29418/cartridges/adop-cartridge-pivotal-cloudfoundry.git",
+			"desc": "ADOP pCF cartridge"
+		}
+	}]
+}
