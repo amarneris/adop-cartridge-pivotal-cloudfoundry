@@ -284,7 +284,7 @@
                                 "docker restart gerrit\n",
                                 "until [[ $(docker exec gerrit curl -I -s ", {"Ref": "AdopUsername"}, ":", {"Ref": "AdopUserPassword"}, "@localhost:8080/gerrit/|head -n 1|cut -d$' ' -f2) == 200 ]]; do echo \"Gerrit unavailable, sleeping for 30s\"; sleep 30; done\n",
                                 "cd /data/platform-management\n",
-                                "echo \"ssh://git@innersource.accenture.com/~andreas.marneris/adop-cartridge-pivotal-cloudfoundry.git\" > cartridges.txt\n",
+                                "echo \"https://github.com/amarneris/adop-cartridge-pivotal-cloudfoundry.git\" > cartridges.txt\n",
                                 "git add cartridges.txt && git commit -m \"Added DOA cartridges\" && git push origin master\n",
                                 "curl -X POST ${INITIAL_ADMIN_USER}:${INITIAL_ADMIN_PASSWORD_PLAIN}@${PUBLIC_IP}/jenkins/job/Platform_Management/job/Load_Cartridge_List/build --data token=$JENKINS_TOKEN\n",
                                 "curl -X POST ${INITIAL_ADMIN_USER}:${INITIAL_ADMIN_PASSWORD_PLAIN}@${PUBLIC_IP}/jenkins/job/Platform_Management/job/Setup_Gerrit/build --data token=$JENKINS_TOKEN\n",
