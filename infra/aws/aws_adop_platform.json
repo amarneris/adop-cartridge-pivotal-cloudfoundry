@@ -80,15 +80,24 @@
             "Type": "String",
             "MinLength": "6",
         },
-        "DefaultIAMRole": {
-          "Default": "Platform_Operator",
-          "Description": "An IAM Role that allows cloudformation to retrieve objects from an S3 bucket.",
+        "ClientName": {
+          "AllowedPattern": "(^[ _.-]*[a-zA-Z0-9 _.-]+$)",
+          "Description": "Must not be blank. Indicate the client or other audience/purpose you are creating this stack for. Any combination of up to 16 letters, numbers and \".-_\" allowed",
           "Type": "String",
+          "MinLength": "1",
+          "MaxLength": "16",
+          "ConstraintDescription": "ClientName must not be blank. Please indicate the client or other audience/purpose you are creating this stack for. Any combination of up to 16 letters, numbers and \".-_\" allowed."
+        },
+        "AssumeIAMRole": {
+          "Default": "false",
+          "Description": "An IAM Role that allows cloudformation to retrieve objects from an S3 bucket. Leave blank to not use any IAM Roles",
+          "Type": "String",
+          "AllowedValues" : ["true", "false"],
         },
         "CreateCustomIAMRole": {
             "Description": "Option to create a custom IAM Role to access S3 resources. Valid values are: 'true' or 'false'. If this is set to 'false', the Defualt IAM Role (Parameter) is going to be used. ",
             "Type": "String",
-            "Default": "true",
+            "Default": "false",
             "AllowedValues" : ["true", "false"],
             "ConstraintDescription" : "must specify 'true' or 'false'."
         }
@@ -100,6 +109,14 @@
                     "Ref": "CreateCustomIAMRole"
                 },
                 "true"
+            ]
+        },
+        "AssumeIAMRoleCondition": {
+            "Fn::Equals" : [
+              {
+                "Ref" : "AssumeIAMRole"
+              },
+              "true"
             ]
         }
     },
@@ -133,8 +150,9 @@
               }
         },
         "AdopInstanceProfile": {
-         "Type": "AWS::IAM::InstanceProfile",
-         "Properties": {
+          "Condition": "AssumeIAMRoleCondition",
+          "Type": "AWS::IAM::InstanceProfile",
+          "Properties": {
             "Path": "/",
             "Roles": [ {
               "Fn::If": [
@@ -143,7 +161,7 @@
                   "Ref": "AdopRole"
                 },
                 {
-                  "Ref": "DefaultIAMRole"
+                  "Fn::Join" : [ "", [ "Platform_Operator" ] ]
                 }
               ]
             } ]
@@ -160,7 +178,7 @@
                     }
                 }],
                 "IamInstanceProfile":{
-                  "Ref": "AdopInstanceProfile"
+                  "Fn::If": ["AssumeIAMRoleCondition", {"Ref": "AdopInstanceProfile"}, {"Fn::Join" : [ "", [ "" ] ]}]
                 },
                 "ImageId": {
                     "Fn::FindInMap": [
@@ -267,12 +285,8 @@
                                 "until [[ $(curl -X GET -s ${INITIAL_ADMIN_USER}:${INITIAL_ADMIN_PASSWORD_PLAIN}@${PUBLIC_IP}/jenkins/job/Load_Platform/lastBuild/api/json?pretty=true|grep result|cut -d$' ' -f5|sed 's|[^a-zA-Z]||g') == SUCCESS ]]; do echo \"Load_Platform job not finished, sleeping for 5s\"; sleep 5; done\n",
                                 "./adop target set -t http://${PUBLIC_IP} -u ${INITIAL_ADMIN_USER} -p ${INITIAL_ADMIN_PASSWORD_PLAIN}\n",
                                 "cd /data; git clone http://${INITIAL_ADMIN_USER}:${INITIAL_ADMIN_PASSWORD_PLAIN}@${PUBLIC_IP}/gerrit/platform-management.git\n",
-                                "export AWS_AZ=$(curl http://169.254.169.254/latest/meta-data/placement/availability-zone)\n",
-                                "export AWS_REGION=$(echo ${AWS_AZ:0:-1})\n",
-                                "aws configure set default.region ${AWS_REGION}\n",
-                                "aws s3 cp --recursive s3://cmt-demo-cloudfoundry-cartridge/rsa-keys/ .\n",
-                                "docker cp id_rsa jenkins:/var/jenkins_home/.ssh/\n",
-                                "docker cp id_rsa.pub jenkins:/var/jenkins_home/.ssh/\n",
+                                "aws configure set default.region ${AWS_DEFAULT_REGION}\n",
+                                "curl -I ${METADATA_URL}/iam/security-credentials/ 2>/dev/null|grep -q 'HTTP/1.0 200 OK' && aws s3 cp --recursive s3://cmt-demo-cloudfoundry-cartridge/rsa-keys/ . && docker cp id_rsa jenkins:/var/jenkins_home/.ssh/ && docker cp id_rsa.pub jenkins:/var/jenkins_home/.ssh/\n",
                                 "docker exec jenkins mkdir -p /var/jenkins_home/userContent/\n",
                                 "docker exec jenkins cp /var/jenkins_home/.ssh/id_rsa.pub /var/jenkins_home/userContent/id_rsa.pub\n",
                                 "docker exec jenkins chmod 600 /var/jenkins_home/.ssh/id_rsa\n",
