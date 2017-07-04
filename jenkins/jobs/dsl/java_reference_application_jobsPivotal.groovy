@@ -40,10 +40,10 @@ pipelineView.with {
     refreshFrequency(5)
 }
 
-def environmentResetPipelineView = buildPipelineView(projectFolderName + "/Destroy_Dev_Environment")
+def environmentResetPipelineView = buildPipelineView(projectFolderName + "/Reset Pivotal Environments")
 
 environmentResetPipelineView.with {
-    title('Pivotal Environment Reset Pipeline')
+    title('Reset Pivotal Environments Pipeline')
     displayedBuilds(5)
     selectedJob(projectFolderName + "/Destroy_Dev_Environment")
     showPipelineDefinitionHeader()
@@ -86,7 +86,8 @@ destroyCFDevJob.with {
             |./cf delete -f adop-petclinic
             |./cf delete-service -f cf-petclinic-db
             |./cf delete-space -f development
-            |set +x'''.stripMargin()
+            |set +x
+            |'''.stripMargin()
         )
     }
     publishers {
@@ -137,7 +138,8 @@ destroyCFProdJob.with {
             |./cf delete -f adop-petclinic-${ENVRIRONMENT_NAME}
             |./cf delete-service -f cf-petclinic-${ENVRIRONMENT_NAME}-db
             |./cf delete-space -f production
-            |set +x'''.stripMargin()
+            |set +x
+            |'''.stripMargin()
         )
     }
 }
