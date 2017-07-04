@@ -79,7 +79,7 @@ destroyCFDevJob.with {
             |set -x
             |set +x
             |echo "========================================================================"
-            |echo "Deleting the ${ENVIRONMENT_NAME}" environment"
+            |echo "Deleting the ${ENVIRONMENT_NAME} environment"
             |echo "========================================================================"
             |set -x
             |./cf target -s development
@@ -131,7 +131,7 @@ destroyCFProdJob.with {
             |set -x
             |set +x
             |echo "========================================================================"
-            |echo "Deleting the ${ENVIRONMENT_NAME}" environment"
+            |echo "Deleting the ${ENVIRONMENT_NAME} environment"
             |echo "========================================================================"
             |set -x
             |./cf target -s production
