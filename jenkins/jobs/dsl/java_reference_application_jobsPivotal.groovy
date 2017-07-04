@@ -16,27 +16,130 @@ def referenceAppGitUrl = "ssh://jenkins@gerrit:29418/${PROJECT_NAME}/" + referen
 def regressionTestGitUrl = "ssh://jenkins@gerrit:29418/${PROJECT_NAME}/" + regressionTestGitRepo
 
 // Jobs
-def buildAppJob = freeStyleJob(projectFolderName + "/Reference_Application_Build")
-def pivotalEphemerolJob = freeStyleJob(projectFolderName + "/ADOP-PivotalCF_Ephemerol_Test")
-def unitTestJob = freeStyleJob(projectFolderName + "/Reference_Application_Unit_Tests")
-def codeAnalysisJob = freeStyleJob(projectFolderName + "/Reference_Application_Code_Analysis")
-def deployJob = freeStyleJob(projectFolderName + "/Reference_Application_Deploy_Dev")
-def deployJobToProd = freeStyleJob(projectFolderName + "/Reference_Application_Deploy_Prod")
-def regressionTestJob = freeStyleJob(projectFolderName + "/Reference_Application_Regression_Tests")
-def performanceTestJob = freeStyleJob(projectFolderName + "/Reference_Application_Performance_Tests")
-def highavailabilityCFDevJob = freeStyleJob(projectFolderName + "/ADOP-PivotalCF_High_Availability_Dev_Test")
-def highavailabilityCFProdJob = freeStyleJob(projectFolderName + "/ADOP-PivotalCF_High_Availability_Prod_Test")
+def buildAppJob = freeStyleJob(projectFolderName + "/Application_Build")
+def pivotalEphemerolJob = freeStyleJob(projectFolderName + "/Application_Cloud_Readiness_Test")
+def unitTestJob = freeStyleJob(projectFolderName + "/Application_Unit_Tests")
+def codeAnalysisJob = freeStyleJob(projectFolderName + "/Application_Code_Analysis")
+def deployJob = freeStyleJob(projectFolderName + "/Application_Deploy_Dev")
+def deployJobToProd = freeStyleJob(projectFolderName + "/Application_Deploy_Prod")
+def regressionTestJob = freeStyleJob(projectFolderName + "/Application_Regression_Tests")
+def performanceTestJob = freeStyleJob(projectFolderName + "/Application_Performance_Tests")
+def highavailabilityCFDevJob = freeStyleJob(projectFolderName + "/High_Availability_Dev_Test")
+def highavailabilityCFProdJob = freeStyleJob(projectFolderName + "/High_Availability_Prod_Test")
+def destroyCFDevJob = freeStyleJob(projectFolderName + "/Destroy_Dev_Environment")
+def destroyCFProdJob = freeStyleJob(projectFolderName + "/Destroy_Prod_Environment")
 
 // Views
-def pipelineView = buildPipelineView(projectFolderName + "/Java_Reference_Application_Pivotal")
+def pipelineView = buildPipelineView(projectFolderName + "/Java_Application_Pivotal")
 
 pipelineView.with {
     title('Java Reference Application Pivotal Pipeline')
     displayedBuilds(5)
-    selectedJob(projectFolderName + "/Reference_Application_Build")
-    showPipelineParameters()
+    selectedJob(projectFolderName + "/Application_Build")
     showPipelineDefinitionHeader()
     refreshFrequency(5)
+}
+
+def environmentResetPipelineView = buildPipelineView(projectFolderName + "/Destroy_Dev_Environment")
+
+environmentResetPipelineView.with {
+    title('Pivotal Environment Reset Pipeline')
+    displayedBuilds(5)
+    selectedJob(projectFolderName + "/Destroy_Dev_Environment")
+    showPipelineDefinitionHeader()
+    refreshFrequency(5)
+}
+
+destroyCFDevJob.with {
+    description("This job destroys the application, service-bindings and space of a Pivotal CF instance")
+    parameters {
+        stringParam("ENVIRONMENT_NAME", 'CI', "Name of the environment.")
+
+    }
+    wrappers {
+        preBuildCleanup()
+        injectPasswords()
+        maskPasswords()
+        sshAgent("adop-jenkins-master")
+        credentialsBinding {
+          usernamePassword("CF_USERNAME", "CF_PASSWORD", pivotalCredentials)
+        }
+    }
+    environmentVariables {
+        env('WORKSPACE_NAME', workspaceFolderName)
+        env('PROJECT_NAME', projectFolderName)
+    }
+    label("docker")
+    steps {
+        shell('''
+            |export SERVICE_NAME="$(echo ${PROJECT_NAME} | tr '/' '_')_${ENVIRONMENT_NAME}"
+            |curl -L "https://cli.run.pivotal.io/stable?release=linux64-binary&source=github" | tar -zx
+            |set +x
+            |./cf login -a api.run.pivotal.io -u ${CF_USERNAME} -p ${CF_PASSWORD}
+            |set -x
+            |set +x
+            |echo "========================================================================"
+            |echo "Deleting the ${ENVIRONMENT_NAME}" environment"
+            |echo "========================================================================"
+            |set -x
+            |./cf target -s development
+            |./cf delete -f adop-petclinic
+            |./cf delete-service -f cf-petclinic-db
+            |./cf delete-space -f development
+            |set +x'''.stripMargin()
+        )
+    }
+    publishers {
+        downstreamParameterized {
+            trigger(projectFolderName + "/Destroy_Prod_Environment") {
+                condition("UNSTABLE_OR_BETTER")
+                parameters {
+                    predefinedProp("ENVIRONMENT_NAME", 'prod')
+                }
+            }
+        }
+    }
+}
+
+destroyCFProdJob.with {
+    description("This job destroys the application, service-bindings and space of a Pivotal CF instance")
+    parameters {
+        stringParam("ENVIRONMENT_NAME", 'prod', "Name of the environment.")
+
+    }
+    wrappers {
+        preBuildCleanup()
+        injectPasswords()
+        maskPasswords()
+        sshAgent("adop-jenkins-master")
+        credentialsBinding {
+          usernamePassword("CF_USERNAME", "CF_PASSWORD", pivotalCredentials)
+        }
+    }
+    environmentVariables {
+        env('WORKSPACE_NAME', workspaceFolderName)
+        env('PROJECT_NAME', projectFolderName)
+    }
+    label("docker")
+    steps {
+        shell('''
+            |export SERVICE_NAME="$(echo ${PROJECT_NAME} | tr '/' '_')_${ENVIRONMENT_NAME}"
+            |curl -L "https://cli.run.pivotal.io/stable?release=linux64-binary&source=github" | tar -zx
+            |set +x
+            |./cf login -a api.run.pivotal.io -u ${CF_USERNAME} -p ${CF_PASSWORD}
+            |set -x
+            |set +x
+            |echo "========================================================================"
+            |echo "Deleting the ${ENVIRONMENT_NAME}" environment"
+            |echo "========================================================================"
+            |set -x
+            |./cf target -s production
+            |./cf delete -f adop-petclinic-${ENVRIRONMENT_NAME}
+            |./cf delete-service -f cf-petclinic-${ENVRIRONMENT_NAME}-db
+            |./cf delete-space -f production
+            |set +x'''.stripMargin()
+        )
+    }
 }
 
 buildAppJob.with {
@@ -81,11 +184,105 @@ buildAppJob.with {
     publishers {
         archiveArtifacts("**/*")
         downstreamParameterized {
-            trigger(projectFolderName + "/ADOP-PivotalCF_Ephemerol_Test") {
+            trigger(projectFolderName + "/Application_Unit_Tests") {
                 condition("UNSTABLE_OR_BETTER")
                 parameters {
                     predefinedProp("B", '${BUILD_NUMBER}')
                     predefinedProp("PARENT_BUILD", '${JOB_NAME}')
+                }
+            }
+        }
+    }
+}
+unitTestJob.with {
+    description("This job runs unit tests on Java Spring reference application.")
+    parameters {
+        stringParam("B", '', "Parent build number")
+        stringParam("PARENT_BUILD", "Application_Build", "Parent build name")
+    }
+    wrappers {
+        preBuildCleanup()
+        injectPasswords()
+        maskPasswords()
+        sshAgent("adop-jenkins-master")
+    }
+    environmentVariables {
+        env('WORKSPACE_NAME', workspaceFolderName)
+        env('PROJECT_NAME', projectFolderName)
+    }
+    label("java8")
+    steps {
+        copyArtifacts("Application_Build") {
+            buildSelector {
+                buildNumber('${B}')
+            }
+        }
+        maven {
+            goals('clean test')
+            mavenInstallation("ADOP Maven")
+        }
+    }
+    publishers {
+        archiveArtifacts("**/*")
+        downstreamParameterized {
+            trigger(projectFolderName + "/Application_Code_Analysis") {
+                condition("UNSTABLE_OR_BETTER")
+                parameters {
+                    predefinedProp("B", '${B}')
+                    predefinedProp("PARENT_BUILD", '${PARENT_BUILD}')
+                }
+            }
+        }
+    }
+}
+
+codeAnalysisJob.with {
+    description("This job runs code quality analysis for Java reference application using SonarQube.")
+    parameters {
+        stringParam("B", '', "Parent build number")
+        stringParam("PARENT_BUILD", "Application_Build", "Parent build name")
+    }
+    environmentVariables {
+        env('WORKSPACE_NAME', workspaceFolderName)
+        env('PROJECT_NAME', projectFolderName)
+        env('PROJECT_NAME_KEY', projectNameKey)
+    }
+    wrappers {
+        preBuildCleanup()
+        injectPasswords()
+        maskPasswords()
+        sshAgent("adop-jenkins-master")
+    }
+    label("java8")
+    steps {
+        copyArtifacts('Application_Build') {
+            buildSelector {
+                buildNumber('${B}')
+            }
+        }
+    }
+    configure { myProject ->
+        myProject / builders << 'hudson.plugins.sonar.SonarRunnerBuilder'(plugin: "sonar@2.2.1") {
+            project('sonar-project.properties')
+            properties('''sonar.projectKey=${PROJECT_NAME_KEY}
+sonar.projectName=${PROJECT_NAME}
+sonar.projectVersion=1.0.${B}
+sonar.sources=src/main/java
+sonar.language=java
+sonar.sourceEncoding=UTF-8
+sonar.scm.enabled=false''')
+            javaOpts()
+            jdk('(Inherit From Job)')
+            task()
+        }
+    }
+    publishers {
+        downstreamParameterized {
+            trigger(projectFolderName + "/Application_Cloud_Readiness_Test") {
+                condition("UNSTABLE_OR_BETTER")
+                parameters {
+                    predefinedProp("B", '${B}')
+                    predefinedProp("PARENT_BUILD", '${PARENT_BUILD}')
                 }
             }
         }
@@ -96,7 +293,7 @@ pivotalEphemerolJob.with {
 description("This job runs Pivotal's ephemerol test utility to detect cloud-readiness.")
 parameters {
     stringParam("B", '', "Parent build number")
-    stringParam("PARENT_BUILD", "Reference_Application_Build", "Parent build name")
+    stringParam("PARENT_BUILD", "Application_Build", "Parent build name")
 }
 wrappers {
     preBuildCleanup()
@@ -110,7 +307,7 @@ environmentVariables {
 }
 label("java8")
 steps {
-    copyArtifacts("Reference_Application_Build") {
+    copyArtifacts("Application_Build") {
         targetDirectory('spring-framework-petclinic')
         buildSelector {
             buildNumber('${B}')
@@ -156,118 +353,24 @@ steps {
 publishers {
     archiveArtifacts("ephemerol_output.html")
     downstreamParameterized {
-        trigger(projectFolderName + "/Reference_Application_Unit_Tests") {
+        trigger(projectFolderName + "/Application_Deploy_Dev") {
             condition("UNSTABLE_OR_BETTER")
             parameters {
                 predefinedProp("B", '${B}')
                 predefinedProp("PARENT_BUILD", '${PARENT_BUILD}')
+                predefinedProp("CF_APP_INSTANCES", '1')
+                predefinedProp("ENVIRONMENT_NAME", 'CI')                
             }
         }
     }
   }
-}
-unitTestJob.with {
-    description("This job runs unit tests on Java Spring reference application.")
-    parameters {
-        stringParam("B", '', "Parent build number")
-        stringParam("PARENT_BUILD", "Reference_Application_Build", "Parent build name")
-    }
-    wrappers {
-        preBuildCleanup()
-        injectPasswords()
-        maskPasswords()
-        sshAgent("adop-jenkins-master")
-    }
-    environmentVariables {
-        env('WORKSPACE_NAME', workspaceFolderName)
-        env('PROJECT_NAME', projectFolderName)
-    }
-    label("java8")
-    steps {
-        copyArtifacts("Reference_Application_Build") {
-            buildSelector {
-                buildNumber('${B}')
-            }
-        }
-        maven {
-            goals('clean test')
-            mavenInstallation("ADOP Maven")
-        }
-    }
-    publishers {
-        archiveArtifacts("**/*")
-        downstreamParameterized {
-            trigger(projectFolderName + "/Reference_Application_Code_Analysis") {
-                condition("UNSTABLE_OR_BETTER")
-                parameters {
-                    predefinedProp("B", '${B}')
-                    predefinedProp("PARENT_BUILD", '${PARENT_BUILD}')
-                }
-            }
-        }
-    }
-}
-
-codeAnalysisJob.with {
-    description("This job runs code quality analysis for Java reference application using SonarQube.")
-    parameters {
-        stringParam("B", '', "Parent build number")
-        stringParam("PARENT_BUILD", "Reference_Application_Build", "Parent build name")
-    }
-    environmentVariables {
-        env('WORKSPACE_NAME', workspaceFolderName)
-        env('PROJECT_NAME', projectFolderName)
-        env('PROJECT_NAME_KEY', projectNameKey)
-    }
-    wrappers {
-        preBuildCleanup()
-        injectPasswords()
-        maskPasswords()
-        sshAgent("adop-jenkins-master")
-    }
-    label("java8")
-    steps {
-        copyArtifacts('Reference_Application_Build') {
-            buildSelector {
-                buildNumber('${B}')
-            }
-        }
-    }
-    configure { myProject ->
-        myProject / builders << 'hudson.plugins.sonar.SonarRunnerBuilder'(plugin: "sonar@2.2.1") {
-            project('sonar-project.properties')
-            properties('''sonar.projectKey=${PROJECT_NAME_KEY}
-sonar.projectName=${PROJECT_NAME}
-sonar.projectVersion=1.0.${B}
-sonar.sources=src/main/java
-sonar.language=java
-sonar.sourceEncoding=UTF-8
-sonar.scm.enabled=false''')
-            javaOpts()
-            jdk('(Inherit From Job)')
-            task()
-        }
-    }
-    publishers {
-        downstreamParameterized {
-            trigger(projectFolderName + "/Reference_Application_Deploy_Dev") {
-                condition("UNSTABLE_OR_BETTER")
-                parameters {
-                    predefinedProp("B", '${B}')
-                    predefinedProp("PARENT_BUILD", '${PARENT_BUILD}')
-                    predefinedProp("CF_APP_INSTANCES", '1')
-                    predefinedProp("ENVIRONMENT_NAME", 'CI')
-                }
-            }
-        }
-    }
 }
 
 deployJob.with {
     description("This job deploys the java reference application to Pivotal CF development space using one instance")
     parameters {
         stringParam("B", '', "Parent build number")
-        stringParam("PARENT_BUILD", "Reference_Application_Build", "Parent build name")
+        stringParam("PARENT_BUILD", "Application_Build", "Parent build name")
         stringParam("CF_APP_INSTANCES", '', "Number of CF instances")
         stringParam("ENVIRONMENT_NAME", '', "Name of the environment.")
 
@@ -287,7 +390,7 @@ deployJob.with {
     }
     label("docker")
     steps {
-        copyArtifacts("Reference_Application_Build") {
+        copyArtifacts("Application_Build") {
             buildSelector {
                 buildNumber('${B}')
                 includePatterns('target/petclinic.war')
@@ -349,7 +452,7 @@ deployJob.with {
     }
     publishers {
         downstreamParameterized {
-            trigger(projectFolderName + "/Reference_Application_Regression_Tests") {
+            trigger(projectFolderName + "/Application_Regression_Tests") {
                 condition("UNSTABLE_OR_BETTER")
                 parameters {
                     predefinedProp("B", '${B}')
@@ -366,7 +469,7 @@ regressionTestJob.with {
     description("This job runs regression tests on deployed java application")
     parameters {
         stringParam("B", '', "Parent build number")
-        stringParam("PARENT_BUILD", "Reference_Application_Build", "Parent build name")
+        stringParam("PARENT_BUILD", "Application_Build", "Parent build name")
         stringParam("ENVIRONMENT_NAME", "CI", "Name of the environment.")
         stringParam("APP_HOSTNAME", "", "The deployed application's hostname.")
     }
@@ -406,7 +509,7 @@ regressionTestJob.with {
             |echo ZAP_PORT=$ZAP_PORT >> env.properties
             |
             |echo "Starting OWASP ZAP Intercepting Proxy"
-            |JOB_WORKSPACE_PATH="/var/lib/docker/volumes/jenkins_slave_home/_data/${PROJECT_NAME}/Reference_Application_Regression_Tests"
+            |JOB_WORKSPACE_PATH="/var/lib/docker/volumes/jenkins_slave_home/_data/${PROJECT_NAME}/Application_Regression_Tests"
             |echo JOB_WORKSPACE_PATH=$JOB_WORKSPACE_PATH >> env.properties
             |mkdir -p ${JOB_WORKSPACE_PATH}/owasp_zap_proxy/test-results
             |docker run -it -d --net=$DOCKER_NETWORK_NAME -v ${JOB_WORKSPACE_PATH}/owasp_zap_proxy/test-results/:/opt/zaproxy/test-results/ -e affinity:container==jenkins-slave --name ${CONTAINER_NAME} -P nhantd/owasp_zap start zap-test
@@ -455,7 +558,7 @@ regressionTestJob.with {
     }
     publishers {
         downstreamParameterized {
-            trigger(projectFolderName + "/Reference_Application_Performance_Tests") {
+            trigger(projectFolderName + "/Application_Performance_Tests") {
                 condition("UNSTABLE_OR_BETTER")
                 parameters {
                     predefinedProp("B", '${B}')
@@ -478,7 +581,7 @@ performanceTestJob.with {
     description("This job run the Jmeter test for the java reference application")
     parameters {
         stringParam("B", '', "Parent build number")
-        stringParam("PARENT_BUILD", "Reference_Application_Regression_Tests", "Parent build name")
+        stringParam("PARENT_BUILD", "Application_Regression_Tests", "Parent build name")
         stringParam("ENVIRONMENT_NAME", "CI", "Name of the environment.")
         stringParam("APP_HOSTNAME", "", "The deployed application's hostname.")
     }
@@ -548,7 +651,7 @@ performanceTestJob.with {
             }
         }
         downstreamParameterized {
-            trigger(projectFolderName + "/ADOP-PivotalCF_High_Availability_Dev_Test") {
+            trigger(projectFolderName + "/High_Availability_Dev_Test") {
                 condition("UNSTABLE_OR_BETTER")
                 parameters {
                     predefinedProp("B", '${B}')
@@ -570,7 +673,7 @@ highavailabilityCFDevJob.with {
     description("This job makes a high availability test on the application that runs in Pivotal CF development space")
     parameters {
         stringParam("B", '', "Parent build number")
-        stringParam("PARENT_BUILD", "Reference_Application_Build", "Parent build name")
+        stringParam("PARENT_BUILD", "Application_Build", "Parent build name")
         stringParam("ENVIRONMENT_NAME", "CI", "Name of the environment.")
         stringParam("APP_HOSTNAME", "", "The deployed application's hostname.")
     }
@@ -589,7 +692,7 @@ highavailabilityCFDevJob.with {
     }
     label("docker")
     steps {
-        copyArtifacts("Reference_Application_Build") {
+        copyArtifacts("Application_Build") {
             buildSelector {
                 buildNumber('${B}')
                 includePatterns('target/petclinic.war')
@@ -635,7 +738,7 @@ highavailabilityCFDevJob.with {
     }
     publishers {
         downstreamParameterized {
-            trigger(projectFolderName + "/Reference_Application_Deploy_Prod") {
+            trigger(projectFolderName + "/Application_Deploy_Prod") {
                 condition("UNSTABLE_OR_BETTER")
                 parameters {
                     predefinedProp("B", '${B}')
@@ -651,7 +754,7 @@ deployJobToProd.with {
     description("This job deploys the java reference application to Pivotal CF production space using 2 instances")
     parameters {
         stringParam("B", '', "Parent build number")
-        stringParam("PARENT_BUILD", "Reference_Application_Build", "Parent build name")
+        stringParam("PARENT_BUILD", "Application_Build", "Parent build name")
         stringParam("CF_APP_INSTANCES", '', "Number of CF instances")
         stringParam("ENVIRONMENT_NAME", "PROD", "Name of the environment.")
     }
@@ -670,7 +773,7 @@ deployJobToProd.with {
     }
     label("docker")
     steps {
-        copyArtifacts("Reference_Application_Build") {
+        copyArtifacts("Application_Build") {
             buildSelector {
                 buildNumber('${B}')
                 includePatterns('target/petclinic.war')
@@ -732,7 +835,7 @@ deployJobToProd.with {
     }
     publishers {
         downstreamParameterized {
-            trigger(projectFolderName + "/ADOP-PivotalCF_High_Availability_Prod_Test") {
+            trigger(projectFolderName + "/High_Availability_Prod_Test") {
                 condition("UNSTABLE_OR_BETTER")
                 parameters {
                     predefinedProp("B", '${B}')
@@ -749,7 +852,7 @@ highavailabilityCFProdJob.with {
     description("This job makes a high availability test on the application that runs in Pivotal CF production space")
     parameters {
         stringParam("B", '', "Parent build number")
-        stringParam("PARENT_BUILD", "Reference_Application_Build", "Parent build name")
+        stringParam("PARENT_BUILD", "Application_Build", "Parent build name")
         stringParam("ENVIRONMENT_NAME", "CI", "Name of the environment.")
         stringParam("APP_HOSTNAME", "", "The deployed application's hostname.")
     }
@@ -768,7 +871,7 @@ highavailabilityCFProdJob.with {
     }
     label("docker")
     steps {
-        copyArtifacts("Reference_Application_Build") {
+        copyArtifacts("Application_Build") {
             buildSelector {
                 buildNumber('${B}')
                 includePatterns('target/petclinic.war')
