@@ -30,7 +30,7 @@ def destroyCFDevJob = freeStyleJob(projectFolderName + "/Destroy_Dev_Environment
 def destroyCFProdJob = freeStyleJob(projectFolderName + "/Destroy_Prod_Environment")
 
 // Views
-def pipelineView = buildPipelineView(projectFolderName + "/Java_Application_Pivotal")
+def pipelineView = buildPipelineView(projectFolderName + "/Java Application Pivotal")
 
 pipelineView.with {
     title('Java Reference Application Pivotal Pipeline')
@@ -64,7 +64,7 @@ destroyCFDevJob.with {
     environmentVariables {
         env('WORKSPACE_NAME', workspaceFolderName)
         env('PROJECT_NAME', projectFolderName)
-        env('ENVIRONMENT_NAME', 'CI')
+        env('ENVIRONMENT_NAME', 'ci')
     }
     label("docker")
     steps {
@@ -80,8 +80,8 @@ destroyCFDevJob.with {
             |echo "========================================================================"
             |set -x
             |./cf target -s development
-            |./cf delete -f adop-petclinic
-            |./cf delete-service -f cf-petclinic-db
+            |./cf delete -f adop-petclinic-${ENVIRONMENT_NAME}
+            |./cf delete-service -f cf-petclinic-${ENVIRONMENT_NAME}-db
             |./cf delete-space -f development
             |set +x
             |'''.stripMargin()
@@ -355,7 +355,7 @@ publishers {
                 predefinedProp("B", '${B}')
                 predefinedProp("PARENT_BUILD", '${PARENT_BUILD}')
                 predefinedProp("CF_APP_INSTANCES", '1')
-                predefinedProp("ENVIRONMENT_NAME", 'CI')
+                predefinedProp("ENVIRONMENT_NAME", 'ci')
             }
         }
     }
@@ -400,8 +400,9 @@ deployJob.with {
             |set -x
             |./cf create-space development
             |./cf target -s development
-            |./cf delete -f adop-petclinic
-            |./cf create-service elephantsql turtle cf-petclinic-db
+            |./cf delete -f adop-petclinic-${ENVIRONMENT_NAME}
+            |./cf delete-service -f cf-petclinic-${ENVIRONMENT_NAME}-db
+            |./cf create-service elephantsql turtle cf-petclinic-${ENVIRONMENT_NAME}-db
             |set +x
             |echo "========================================================================"
             |echo "Creating the application manifest file"
@@ -410,12 +411,12 @@ deployJob.with {
             |cat <<EOF > manifest.yml
             |---
             |applications:
-            |- name: adop-petclinic
+            |- name: adop-petclinic-${ENVIRONMENT_NAME}
             |  memory: 512m
             |  instances: ${CF_APP_INSTANCES}
             |  random-route: true
             |  services:
-            |    - cf-petclinic-db
+            |    - cf-petclinic-${ENVIRONMENT_NAME}-db
             |  env:
             |    JAVA_OPTS: "-Dspring.profiles.active=jdbc"
             |EOF
@@ -424,8 +425,8 @@ deployJob.with {
             |echo "Pushing application to Pivotal CF using ${CF_APP_INSTANCES} instance(s)"
             |echo "========================================================================"
             |set -x
-            |./cf push adop-petclinic -p ${WORKSPACE}/target/petclinic.war
-            |APP_HOSTNAME=$(./cf apps |grep adop-petclinic |awk '{print $6}')
+            |./cf push -f manifest.yml -p ${WORKSPACE}/target/petclinic.war
+            |APP_HOSTNAME=$(./cf apps |grep adop-petclinic-${ENVIRONMENT_NAME} |awk '{print $6}')
             |echo "APP_HOSTNAME=${APP_HOSTNAME}" > ${WORKSPACE}/app_hostname.txt
             |COUNT=1
             |while ! curl -f -q http://${APP_HOSTNAME}/ -o /dev/null
@@ -466,7 +467,7 @@ regressionTestJob.with {
     parameters {
         stringParam("B", '', "Parent build number")
         stringParam("PARENT_BUILD", "Application_Build", "Parent build name")
-        stringParam("ENVIRONMENT_NAME", "CI", "Name of the environment.")
+        stringParam("ENVIRONMENT_NAME", "ci", "Name of the environment.")
         stringParam("APP_HOSTNAME", "", "The deployed application's hostname.")
     }
     scm {
@@ -578,7 +579,7 @@ performanceTestJob.with {
     parameters {
         stringParam("B", '', "Parent build number")
         stringParam("PARENT_BUILD", "Application_Regression_Tests", "Parent build name")
-        stringParam("ENVIRONMENT_NAME", "CI", "Name of the environment.")
+        stringParam("ENVIRONMENT_NAME", "ci", "Name of the environment.")
         stringParam("APP_HOSTNAME", "", "The deployed application's hostname.")
     }
     wrappers {
@@ -670,7 +671,7 @@ highavailabilityCFDevJob.with {
     parameters {
         stringParam("B", '', "Parent build number")
         stringParam("PARENT_BUILD", "Application_Build", "Parent build name")
-        stringParam("ENVIRONMENT_NAME", "CI", "Name of the environment.")
+        stringParam("ENVIRONMENT_NAME", "ci", "Name of the environment.")
         stringParam("APP_HOSTNAME", "", "The deployed application's hostname.")
     }
     wrappers {
@@ -708,7 +709,7 @@ highavailabilityCFDevJob.with {
             |echo "Killing CF application in CF developement space"
             |echo "================================================================="
             |set -x
-            |./cf ssh adop-petclinic -c 'kill -9 $(pidof java)'
+            |./cf ssh adop-petclinic-{ENVIRONMENT_NAME} -c 'kill -9 $(pidof java)'
             |set +x
             |echo "================================================================="
             |echo "Instance killed - Waiting until the application comes up again"
@@ -740,7 +741,7 @@ highavailabilityCFDevJob.with {
                     predefinedProp("B", '${B}')
                     predefinedProp("PARENT_BUILD", '${PARENT_BUILD}')
                     predefinedProp("CF_APP_INSTANCES", '2')
-                    predefinedProp("ENVIRONMENT_NAME", '${ENVIRONMENT_NAME}')
+                    predefinedProp("ENVIRONMENT_NAME", 'prod')
                 }
             }
         }
@@ -752,7 +753,7 @@ deployJobToProd.with {
         stringParam("B", '', "Parent build number")
         stringParam("PARENT_BUILD", "Application_Build", "Parent build name")
         stringParam("CF_APP_INSTANCES", '', "Number of CF instances")
-        stringParam("ENVIRONMENT_NAME", "PROD", "Name of the environment.")
+        stringParam("ENVIRONMENT_NAME", "prod", "Name of the environment.")
     }
     wrappers {
         preBuildCleanup()
@@ -784,7 +785,7 @@ deployJobToProd.with {
             |set -x
             |./cf create-space production
             |./cf target -s production
-            |./cf create-service elephantsql turtle cf-petclinic-prod-db
+            |./cf create-service elephantsql turtle cf-petclinic-${ENVIRONMENT_NAME}-db
             |set +x
             |echo "========================================================================"
             |echo "Creating the application manifest file"
@@ -793,12 +794,12 @@ deployJobToProd.with {
             |cat <<EOF > manifest.yml
             |---
             |applications:
-            |- name: adop-petclinic-prod
+            |- name: adop-petclinic-${ENVIRONMENT_NAME}
             |  memory: 512m
             |  instances: ${CF_APP_INSTANCES}
             |  random-route: true
             |  services:
-            |    - cf-petclinic-prod-db
+            |    - cf-petclinic-${ENVIRONMENT_NAME}-db
             |  env:
             |    JAVA_OPTS: "-Dspring.profiles.active=jdbc"
             |EOF
@@ -807,9 +808,9 @@ deployJobToProd.with {
             |echo "Pushing application to Pivotal CF using ${CF_APP_INSTANCES} instance(s)"
             |echo "========================================================================"
             |set -x
-            |./cf push adop-petclinic-prod -p ${WORKSPACE}/target/petclinic.war -m 512mb -i ${CF_APP_INSTANCES}
+            |./cf push -f manifest.yml -p ${WORKSPACE}/target/petclinic.war
             |
-            |APP_HOSTNAME=$(./cf apps |grep adop-petclinic-prod |awk '{print $6}')
+            |APP_HOSTNAME=$(./cf apps |grep adop-petclinic-${ENVIRONMENT_NAME} |awk '{print $6}')
             |echo "APP_HOSTNAME=${APP_HOSTNAME}" > ${WORKSPACE}/app_hostname.txt
             |COUNT=1
             |while ! curl -f -q http://${APP_HOSTNAME}/ -o /dev/null
@@ -849,7 +850,7 @@ highavailabilityCFProdJob.with {
     parameters {
         stringParam("B", '', "Parent build number")
         stringParam("PARENT_BUILD", "Application_Build", "Parent build name")
-        stringParam("ENVIRONMENT_NAME", "CI", "Name of the environment.")
+        stringParam("ENVIRONMENT_NAME", "prod", "Name of the environment.")
         stringParam("APP_HOSTNAME", "", "The deployed application's hostname.")
     }
     wrappers {
@@ -887,7 +888,7 @@ highavailabilityCFProdJob.with {
             |echo "Killing 1 of the 2 CF instances where the application is deployed"
             |echo "=================================================================================="
             |set -x
-            |./cf ssh adop-petclinic-prod -c 'kill -9 $(pidof java)' -i 0
+            |./cf ssh adop-petclinic-${ENVIRONMENT_NAME} -c 'kill -9 $(pidof java)' -i 0
             |set +x
             |echo "=================================================================================="
             |echo "Instance killed - Verifying that the application is not affected"
