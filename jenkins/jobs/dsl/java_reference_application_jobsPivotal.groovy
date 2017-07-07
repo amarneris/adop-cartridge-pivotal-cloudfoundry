@@ -51,11 +51,7 @@ environmentResetPipelineView.with {
 }
 
 destroyCFDevJob.with {
-    description("This job destroys the application, service-bindings and space of a Pivotal CF instance")
-    parameters {
-        stringParam("ENVIRONMENT_NAME", 'CI', "Name of the environment.")
-
-    }
+    description("This job destroys the application, service-bindings and space from Pivotal CF")
     wrappers {
         preBuildCleanup()
         injectPasswords()
@@ -68,6 +64,7 @@ destroyCFDevJob.with {
     environmentVariables {
         env('WORKSPACE_NAME', workspaceFolderName)
         env('PROJECT_NAME', projectFolderName)
+        env('ENVIRONMENT_NAME', 'CI')
     }
     label("docker")
     steps {
@@ -103,11 +100,7 @@ destroyCFDevJob.with {
 }
 
 destroyCFProdJob.with {
-    description("This job destroys the application, service-bindings and space of a Pivotal CF instance")
-    parameters {
-        stringParam("ENVIRONMENT_NAME", 'prod', "Name of the environment.")
-
-    }
+    description("This job destroys the application, service-bindings and space from Pivotal CF")
     wrappers {
         preBuildCleanup()
         injectPasswords()
@@ -120,6 +113,7 @@ destroyCFProdJob.with {
     environmentVariables {
         env('WORKSPACE_NAME', workspaceFolderName)
         env('PROJECT_NAME', projectFolderName)
+        env('ENVIRONMENT_NAME', 'prod')
     }
     label("docker")
     steps {
@@ -361,7 +355,7 @@ publishers {
                 predefinedProp("B", '${B}')
                 predefinedProp("PARENT_BUILD", '${PARENT_BUILD}')
                 predefinedProp("CF_APP_INSTANCES", '1')
-                predefinedProp("ENVIRONMENT_NAME", 'CI')                
+                predefinedProp("ENVIRONMENT_NAME", 'CI')
             }
         }
     }
