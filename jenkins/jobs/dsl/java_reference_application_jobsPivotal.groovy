@@ -709,7 +709,7 @@ highavailabilityCFDevJob.with {
             |echo "Killing CF application in CF developement space"
             |echo "================================================================="
             |set -x
-            |./cf ssh adop-petclinic-{ENVIRONMENT_NAME} -c 'kill -9 $(pidof java)'
+            |./cf ssh adop-petclinic-${ENVIRONMENT_NAME} -c 'kill -9 $(pidof java)'
             |set +x
             |echo "================================================================="
             |echo "Instance killed - Waiting until the application comes up again"
