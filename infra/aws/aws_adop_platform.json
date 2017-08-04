@@ -255,7 +255,7 @@
                                 "echo '=========================== Installing Docker Compose =========================='\n",
                                 "curl -L https://github.com/docker/compose/releases/download/1.7.1/docker-compose-`uname -s`-`uname -m` > /usr/bin/docker-compose\n",
                                 "chmod +x /usr/bin/docker-compose\n",
-                                "echo '=========================== Running Docker Compose =========================='\n",
+                                "echo '=========================== Setting up Environment Variables =========================='\n",
                                 "export IP=$(hostname --ip-address)\n",
                                 "export PUBLIC_IP=$(curl http://instance-data/latest/meta-data/public-ipv4)\n",
                                 "export PRIVATE_IP=$(curl http://instance-data/latest/meta-data/local-ipv4)\n",
@@ -265,6 +265,14 @@
                                 "export DOCKER_HOST=tcp://${PRIVATE_IP}:2375\n",
                                 "export PIVOTAL_USER=", {"Ref": "PivotalUser"}, "\n",
                                 "export PIVOTAL_USER_PASSWORD=", {"Ref": "PivotalUserPassword"}, "\n",
+                                "export WORKSPACE=PCF\n",
+                                "export PROJECT_NAME=Labs\n",
+                                "export CARTRIDGE_NAME=PCF_Cartridge\n",
+                                "export PROJECT_NAME_LOWERCASE=$(echo ${PROJECT_NAME} | tr '[:upper:]' '[:lower:]')\n",
+                                "export WORKSPACE_LOWERCASE=$(echo ${WORKSPACE} | tr '[:upper:]' '[:lower:]')\n",
+                                "export CARTRIDGE_NAME_LOWERCASE=$(echo ${CARTRIDGE_NAME} | tr '[:upper:]' '[:lower:]')\n",
+                                "export GIT_REPOSITORY=spring-framework-petclinic.git\n",
+                                "echo '=========================== Running Docker Compose =========================='\n",
                                 "set -e\n",
                                 "mkdir -p /data && cd /data\n",
                                 "git clone https://github.com/Accenture/adop-docker-compose\n",
@@ -285,6 +293,7 @@
                                 "until [[ $(curl -X GET -s ${INITIAL_ADMIN_USER}:${INITIAL_ADMIN_PASSWORD_PLAIN}@${PUBLIC_IP}/jenkins/job/Load_Platform/lastBuild/api/json?pretty=true|grep result|cut -d$' ' -f5|sed 's|[^a-zA-Z]||g') == SUCCESS ]]; do echo \"Load_Platform job not finished, sleeping for 5s\"; sleep 5; done\n",
                                 "./adop target set -t http://${PUBLIC_IP} -u ${INITIAL_ADMIN_USER} -p ${INITIAL_ADMIN_PASSWORD_PLAIN}\n",
                                 "cd /data; git clone http://${INITIAL_ADMIN_USER}:${INITIAL_ADMIN_PASSWORD_PLAIN}@${PUBLIC_IP}/gerrit/platform-management.git\n",
+                                "echo '=========================== Configuring ADOP =========================='\n",
                                 "aws configure set default.region ${AWS_DEFAULT_REGION}\n",
                                 "curl -I ${METADATA_URL}/iam/security-credentials/ 2>/dev/null|grep -q 'HTTP/1.0 200 OK' && aws s3 cp --recursive s3://cmt-demo-cloudfoundry-cartridge/rsa-keys/ . && docker cp id_rsa jenkins:/var/jenkins_home/.ssh/ && docker cp id_rsa.pub jenkins:/var/jenkins_home/.ssh/\n",
                                 "docker exec jenkins mkdir -p /var/jenkins_home/userContent/\n",
@@ -294,6 +303,19 @@
                                 "echo ",{"Ref": "PivotalUser"}," > pivotal_credentials.txt\n",
                                 "echo ",{"Ref": "PivotalUserPassword"}," >> pivotal_credentials.txt\n",
                                 "docker cp pivotal_credentials.txt jenkins:/var/jenkins_home/\n",
+                                "echo '=========================== Configuring Release Note =========================='\n",
+                                "wget https://s3.amazonaws.com/cmt-demo-cloudfoundry-cartridge/data/nginx/demo-release-note.tar.gz -O demo-release-note.tar.gz && tar -xzf demo-release-note.tar.gz && rm -rf demo-release-note.tar.gz\n",
+                                "sed -i \"s/###TOKEN_INSTANCE_IP###/$PUBLIC_IP/g\" demo-release-note.html\n",
+                                "sed -i \"s/###TOKEN_WORKSPACE###/$WORKSPACE/g\" demo-release-note.html\n",
+                                "sed -i \"s/###TOKEN_PROJECT_NAME###/$PROJECT_NAME/g\" demo-release-note.html\n",
+                                "sed -i \"s/###TOKEN_CARTRIDGE_NAME###/$CARTRIDGE_NAME/g\" demo-release-note.html\n",
+                                "sed -i \"s/###TOKEN_WORKSPACE_LOWERCASE###/$WORKSPACE_LOWERCASE/g\" demo-release-note.html\n",
+                                "sed -i \"s/###TOKEN_PROJECT_NAME_LOWERCASE###/$PROJECT_NAME_LOWERCASE/g\" demo-release-note.html\n",
+                                "sed -i \"s/###TOKEN_CARTRIDGE_NAME_LOWERCASE###/$CARTRIDGE_NAME_LOWERCASE/g\" demo-release-note.html\n",
+                                "sed -i \"s/###TOKEN_GIT_REPOSITORY###/$GIT_REPOSITORY/g\" demo-release-note.html\n",
+                                "sed -i \"s/###TOKEN_GIT_USERNAME###/$INITIAL_ADMIN_USER/g\" demo-release-note.html\n",
+                                "docker cp demo-release-note.html proxy:/usr/share/nginx/html/bp/demo-release-note.html\n",
+
                                 "docker restart jenkins\n",
                                 "docker restart gerrit\n",
                                 "until [[ $(docker exec gerrit curl -I -s ", {"Ref": "AdopUsername"}, ":", {"Ref": "AdopUserPassword"}, "@localhost:8080/gerrit/|head -n 1|cut -d$' ' -f2) == 200 ]]; do echo \"Gerrit unavailable, sleeping for 30s\"; sleep 30; done\n",
@@ -330,11 +352,6 @@
                 "GroupDescription": "Enabling access to all IPs and below listed ports",
                 "SecurityGroupIngress": [{
                     "CidrIp": "0.0.0.0/0",
-                    "FromPort": "22",
-                    "IpProtocol": "tcp",
-                    "ToPort": "22"
-                }, {
-                    "CidrIp": "0.0.0.0/0",
                     "FromPort": "80",
                     "IpProtocol": "tcp",
                     "ToPort": "80"
@@ -343,16 +360,27 @@
                     "FromPort": "80",
                     "IpProtocol": "tcp",
                     "ToPort": "80"
-                }, {
-                    "CidrIp": "0.0.0.0/0",
-                    "FromPort": "443",
-                    "IpProtocol": "tcp",
-                    "ToPort": "443"
                 }
                 ],
                 "VpcId": {
                     "Ref": "Vpc"
-                }
+                },
+                "Tags": [
+                  {
+                    "Key": "Name",
+                    "Value": {
+                      "Fn::Join": [
+                        "-",
+                        [
+                          {
+                            "Ref": "AWS::StackName"
+                          },
+                          "AdopSecurityGroup"
+                        ]
+                      ]
+                    }
+                  }
+                ]
             },
             "Type": "AWS::EC2::SecurityGroup"
         },
@@ -372,7 +400,23 @@
             "Properties": {
                 "VpcId": {
                     "Ref": "Vpc"
-                }
+                },
+                "Tags": [
+                  {
+                    "Key": "Name",
+                    "Value": {
+                      "Fn::Join": [
+                        "-",
+                        [
+                          {
+                            "Ref": "AWS::StackName"
+                          },
+                          "AdopPublicRouteTable"
+                        ]
+                      ]
+                    }
+                  }
+                ]
             },
             "Type": "AWS::EC2::RouteTable"
         },
@@ -381,7 +425,23 @@
                 "CidrBlock": "10.0.1.0/24",
                 "VpcId": {
                     "Ref": "Vpc"
-                }
+                },
+                "Tags": [
+                  {
+                    "Key": "Name",
+                    "Value": {
+                      "Fn::Join": [
+                        "-",
+                        [
+                          {
+                            "Ref": "AWS::StackName"
+                          },
+                          "AdopPublicSubnet"
+                        ]
+                      ]
+                    }
+                  }
+                ]
             },
             "Type": "AWS::EC2::Subnet"
         },
@@ -400,7 +460,23 @@
             "Properties": {
                 "CidrBlock": "10.0.0.0/16",
                 "EnableDnsHostnames": "true",
-                "EnableDnsSupport": "true"
+                "EnableDnsSupport": "true",
+                "Tags": [
+                  {
+                    "Key": "Name",
+                    "Value": {
+                      "Fn::Join": [
+                        "-",
+                        [
+                          {
+                            "Ref": "AWS::StackName"
+                          },
+                          "AdopVpc"
+                        ]
+                      ]
+                    }
+                  }
+                ]
             },
             "Type": "AWS::EC2::VPC"
         },
@@ -416,7 +492,25 @@
             "Type": "AWS::EC2::VPCGatewayAttachment"
         },
         "VpcInternetGateway": {
-            "Type": "AWS::EC2::InternetGateway"
+            "Type": "AWS::EC2::InternetGateway",
+            "Properties" : {
+              "Tags": [
+                {
+                  "Key": "Name",
+                  "Value": {
+                    "Fn::Join": [
+                      "-",
+                      [
+                        {
+                          "Ref": "AWS::StackName"
+                        },
+                        "AdopVpcInternetGateway"
+                      ]
+                    ]
+                  }
+                }
+              ]
+            }
         },
         "AdopWaitConditionHandle": {
             "Type": "AWS::CloudFormation::WaitConditionHandle",

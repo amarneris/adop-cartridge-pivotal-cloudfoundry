@@ -439,6 +439,19 @@ deployJob.with {
             |  sleep 5
             |  COUNT=$((COUNT+1))
             |done
+            |cat <<EOF > application_url.html
+            |<!DOCTYPE html>
+            |<html>
+            |<head>
+            |<title>${ENVIRONMENT_NAME^^} Environment URL</title>
+            |</head>
+            |<body>
+            |<h1>${ENVIRONMENT_NAME^^} Environment URL</h1>
+            |<p>A dynamic URL has been generated for the ${ENVIRONMENT_NAME^^} environment:</p>
+            |<p><a href="http://${APP_HOSTNAME}/">http://${APP_HOSTNAME}/</a></p>
+            |</body>
+            |</html>
+            |EOF
             |set +x
             |echo "=.=.=.=.=.=.=.=.=.=.=.=."
             |echo "=.=.=.=.=.=.=.=.=.=.=.=."
@@ -448,6 +461,7 @@ deployJob.with {
         )
     }
     publishers {
+        archiveArtifacts("application_url.html")
         downstreamParameterized {
             trigger(projectFolderName + "/Application_Regression_Tests") {
                 condition("UNSTABLE_OR_BETTER")
@@ -823,6 +837,19 @@ deployJobToProd.with {
             |  sleep 5
             |  COUNT=$((COUNT+1))
             |done
+            |cat <<EOF > application_url.html
+            |<!DOCTYPE html>
+            |<html>
+            |<head>
+            |<title>${ENVIRONMENT_NAME^^} Environment URL</title>
+            |</head>
+            |<body>
+            |<h1>${ENVIRONMENT_NAME^^} Environment URL</h1>
+            |<p>A dynamic URL has been generated for the ${ENVIRONMENT_NAME^^} environment:</p>
+            |<p><a href="http://${APP_HOSTNAME}/">http://${APP_HOSTNAME}/</a></p>
+            |</body>
+            |</html>
+            |EOF
             |set +x
             |echo "=.=.=.=.=.=.=.=.=.=.=.=."
             |echo "=.=.=.=.=.=.=.=.=.=.=.=."
@@ -831,6 +858,7 @@ deployJobToProd.with {
             |echo "=.=.=.=.=.=.=.=.=.=.=.=."'''.stripMargin())
     }
     publishers {
+        archiveArtifacts("application_url.html")
         downstreamParameterized {
             trigger(projectFolderName + "/High_Availability_Prod_Test") {
                 condition("UNSTABLE_OR_BETTER")
@@ -905,3 +933,6 @@ highavailabilityCFProdJob.with {
     }
 
 }
+
+// queue job for execution (automatically start the first run of the pipeline)
+queue(buildAppJob)
